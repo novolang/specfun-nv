@@ -1,0 +1,44 @@
+[package]
+name        = "specfun-nv"
+version     = "0.0.1"
+description = "The special functions of mathematical statistics: gamma, log-gamma with its sign returned separately, digamma, beta, the error function and its complement, the regularised incomplete gamma and beta with their inverses, and the Bessel functions J, Y, I and K at integer and at real order — every one of them answering a Result whose fault names the domain rule it broke."
+license     = "Apache-2.0"
+
+# An INTERFACE release: every `pub fn` body is a `todo()`, so the
+# signatures and the effect rows are published and nothing is
+# implemented.  `novo pkg publish` recognises the shape and requires
+# both the draft stability and the 0.0.x version; the first
+# implementation is the 0.1.0 published over it.
+stability   = "draft"
+
+# `core`.  Every function here is a Float in and a Float out, computed
+# by a series, a continued fraction or a recurrence over what the
+# caller already holds.  Nothing is read, nothing is written, no clock
+# and no entropy is consulted, and no function takes a stream — so the
+# sans-IO question that shapes most core packages does not arise here
+# at all.  The whole surface is `[]`, and there are no host_modules.
+layer       = "core"
+
+category    = "science"
+
+tags        = ["special-functions", "gamma", "erf", "bessel", "statistics", "numerical", "science"]
+repository  = "https://github.com/novolang/specfun-nv"
+maintainers = ["novo-lang"]
+novo        = ">= 0.9.0"
+
+# A library: no `main`, so `novo pkg build` type-checks and
+# effect-checks every module under `src/` and writes no binary.
+
+[docs.pages]
+"README.md" = "Gamma, erf, the incomplete forms and the Bessel functions, each refusing rather than returning a NaN"
+
+[dependencies]
+# None, and deliberately none.  Every function here takes Floats and
+# answers a Float, and the arithmetic it is built from — the four
+# operations, `exp`, `ln`, `sin`, `cos`, `sqrt` — is in the standard
+# library's `math` module.  A dependency on an array package would be
+# the wrong shape: these are scalar functions, and a caller who wants
+# them elementwise over an array maps one of them across it.  That
+# keeps the package at the bottom of the dependency order, where
+# `stats-nv` and anything else that needs a distribution function can
+# take it without inheriting a closure.

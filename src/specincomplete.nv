@@ -1,0 +1,232 @@
+// specincomplete.nv — the incomplete gamma and the incomplete beta,
+// which are the cumulative distribution functions of half of
+// statistics.
+//
+// WHAT THEY ARE.  The gamma function is an integral from zero to
+// infinity.  Stop the integral early and you have the LOWER incomplete
+// gamma; start it partway and run to infinity and you have the UPPER
+// one.  Divide each by the complete gamma and the results run from 0
+// to 1: those are the REGULARISED forms, written `P(a, x)` and
+// `Q(a, x)` in the references, and they sum to 1 at every point.
+//
+// The same construction on the beta function gives the regularised
+// incomplete beta, written `I_x(a, b)`, which runs from 0 at `x = 0`
+// to 1 at `x = 1`.
+//
+// WHY A STATISTICS PACKAGE CANNOT DO WITHOUT THEM.  `P(a, x)` IS the
+// cumulative distribution function of the gamma distribution, and
+// therefore of the chi-squared, the Erlang and the Poisson; `I_x(a,
+// b)` IS the cumulative distribution function of the beta
+// distribution, and therefore of Student's t, of the F distribution
+// and of the binomial.  Every p-value in those families is one call to
+// one of these two functions with its arguments rearranged.  A package
+// that has the densities but not these has the pictures and not the
+// numbers.
+//
+// WHY THE REGULARISED FORMS ARE THE PUBLISHED ONES.  The unregularised
+// integrals overflow for shape parameters a fitting routine reaches in
+// its first few steps, while the regularised ones are probabilities
+// and stay in [0, 1] for every argument in the domain.  A caller who
+// genuinely wants the unregularised value multiplies by `gamma(a)` or
+// `beta(a, b)` and can see the overflow happen in their own
+// expression rather than inside this package.
+//
+// WHY `P` AND `Q` ARE BOTH PUBLISHED.  For the same reason `erfc`
+// exists beside `erf`: in the far tail one of them is the small number
+// the caller actually wants, and computing it as `1 - other` in binary
+// floating point leaves almost no correct digits.  `P + Q` is 1
+// mathematically and that identity is a test, not an implementation.
+//
+// THE INVERSES.  Each regularised form has an inverse in its argument:
+// given a probability, the point at which the distribution reaches it.
+// That is what a critical value and a quantile are, so
+// `gamma_p_inv` is the chi-squared quantile function and
+// `beta_inc_inv` is the Student's t and F quantile function, once
+// their arguments are rearranged.  The inverses iterate, so
+// `SpecNoConvergence` is a reachable answer and it carries the
+// argument that did not converge.
+//
+// ACCURACY.  A relative error at or below 1e-13 against
+// scipy.special over the domain, which is one digit looser than the
+// rest of the package because these are iterations rather than
+// closed forms.
+
+// The regularised lower incomplete gamma, `P(a, x)`.
+//
+// The cumulative distribution function of the gamma distribution with
+// shape `a` and unit scale, so it runs from 0 at `x = 0` to 1 as `x`
+// grows.  `gamma_p(1.0, 1.0)` is 0.6321205588285577, which is
+// `1 - 1/e`, the exponential distribution's value at its mean.
+//
+// `SpecNotPositive` when `a` is not strictly positive and
+// `SpecNegative` when `x` is below zero.  For a tail probability use
+// `gamma_q`.
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.gamma_p(1.0, 1.0)
+//         Ok(v)  => println("${v}")   // 0.6321205588285577
+//         Err(e) => println(e.message())
+// ```
+pub fn gamma_p(a: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.gamma_p")
+
+// The regularised upper incomplete gamma, `Q(a, x)`, computed
+// directly rather than as `1 - P(a, x)`.
+//
+// The survival function of the gamma distribution, and therefore the
+// p-value of a chi-squared test once its arguments are rearranged.
+// `gamma_q(1.0, 1.0)` is 0.36787944117144233, which is `1/e`.
+//
+// It keeps its relative accuracy far into the tail, where the
+// subtraction from 1 has none.  Same domain and same faults as
+// `gamma_p`.
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.gamma_q(1.0, 1.0)
+//         Ok(v)  => println("${v}")   // 0.36787944117144233
+//         Err(e) => println(e.message())
+// ```
+pub fn gamma_q(a: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.gamma_q")
+
+// The inverse of `gamma_p` in its second argument: the `x` at which
+// `P(a, x)` reaches `p`.
+//
+// The quantile function of the gamma distribution, and therefore the
+// chi-squared critical value.  `p` must lie in [0, 1] —
+// `SpecNotProbability` otherwise — and `a` must be strictly positive.
+//
+// It iterates, so `SpecNoConvergence` is a reachable answer, carrying
+// the probability it was working on and the number of steps it spent.
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.gamma_p_inv(1.0, 0.6321205588285577)
+//         Ok(v)  => println("${v}")   // 1
+//         Err(e) => println(e.message())
+// ```
+pub fn gamma_p_inv(a: Float, p: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.gamma_p_inv")
+
+// The inverse of `gamma_q` in its second argument: the `x` at which
+// `Q(a, x)` falls to `q`.
+//
+// The one to use when the caller holds a small tail probability,
+// for the same reason `gamma_q` is the one to compute it with.
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.gamma_q_inv(1.0, 0.36787944117144233)
+//         Ok(v)  => println("${v}")   // 1
+//         Err(e) => println(e.message())
+// ```
+pub fn gamma_q_inv(a: Float, q: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.gamma_q_inv")
+
+// The regularised incomplete beta, `I_x(a, b)`.
+//
+// The cumulative distribution function of the beta distribution with
+// shapes `a` and `b`, running from 0 at `x = 0` to 1 at `x = 1`.
+// `beta_inc(2.0, 3.0, 0.5)` is 0.6875.  Student's t, the F
+// distribution and the binomial tail are all this function with
+// rearranged arguments.
+//
+// `SpecNotPositive` when `a` or `b` is not strictly positive, naming
+// which; `SpecOutOfInterval` when `x` is outside [0, 1].
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.beta_inc(2.0, 3.0, 0.5)
+//         Ok(v)  => println("${v}")   // 0.6875
+//         Err(e) => println(e.message())
+// ```
+pub fn beta_inc(a: Float, b: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.beta_inc")
+
+// The complement of the regularised incomplete beta, computed
+// directly rather than as `1 - I_x(a, b)`.
+//
+// `I_x(a, b)` and this sum to 1, and it is the symmetry
+// `I_x(a, b) = 1 - I_{1-x}(b, a)` written as a function so that the
+// small side of the distribution is always the one computed.  It is
+// the two-sided p-value of a t-test, once the arguments are
+// rearranged.
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.beta_inc_c(2.0, 3.0, 0.5)
+//         Ok(v)  => println("${v}")   // 0.3125
+//         Err(e) => println(e.message())
+// ```
+pub fn beta_inc_c(a: Float, b: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.beta_inc_c")
+
+// The inverse of `beta_inc` in its third argument: the `x` at which
+// `I_x(a, b)` reaches `p`.
+//
+// The quantile function of the beta distribution, and therefore the
+// critical value of a t-test and of an F-test.  `p` must lie in
+// [0, 1]; the shapes must be strictly positive.  It iterates, so
+// `SpecNoConvergence` is a reachable answer.
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.beta_inc_inv(2.0, 3.0, 0.6875)
+//         Ok(v)  => println("${v}")   // 0.5
+//         Err(e) => println(e.message())
+// ```
+pub fn beta_inc_inv(a: Float, b: Float, p: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.beta_inc_inv")
+
+// The natural logarithm of the regularised lower incomplete gamma.
+//
+// For a shape parameter in the hundreds the probability itself
+// underflows to zero long before it stops being the quantity a
+// likelihood needs, and a log-likelihood written from `ln(gamma_p(a,
+// x))` is then `ln(0.0)`.  This computes the logarithm directly and
+// stays finite there.
+//
+// Same domain and same faults as `gamma_p`.
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.log_gamma_p(1.0, 1.0)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn log_gamma_p(a: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.log_gamma_p")
+
+// The natural logarithm of the regularised incomplete beta, for the
+// same reason `log_gamma_p` exists.
+//
+// Same domain and same faults as `beta_inc`.
+//
+// ```novo
+// use specincomplete
+//
+// fn main() [io]
+//     match specincomplete.log_beta_inc(2.0, 3.0, 0.5)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn log_beta_inc(a: Float, b: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specincomplete.log_beta_inc")

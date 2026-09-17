@@ -1,0 +1,60 @@
+// specfault_tests.nv — a fault names the domain rule it broke and
+// carries the argument that broke it.
+//
+// RED ON PURPOSE: every assertion reaches `not implemented:
+// specfun-nv.SpecFault.message`.
+//
+// This is the suite for the decision the whole package rests on.  The
+// alternative — returning a NaN — carries no reason, propagates
+// silently through the arithmetic that follows it, and leaves a
+// caller with four special-function calls in one expression to bisect
+// the expression by hand.  So the one rule asserted here is that the
+// message says which rule was broken and prints the number that broke
+// it.
+
+use std.test
+
+@test
+fn test_a_pole_names_the_argument_it_was_asked_about() [io]
+    test.case("the gamma function's poles")
+    let p = SpecGammaPole(-3.0)
+    test.assert(str.contains(p.message(), "-3"))
+    test.assert(str.len(p.message()) > 0)
+
+@test
+fn test_a_domain_fault_names_the_parameter_and_the_value() [io]
+    test.case("strictly positive: the parameter as the reference spells it, and what arrived")
+    let np = SpecNotPositive("a", 0.0)
+    test.assert(str.contains(np.message(), "a"))
+
+    test.case("at or above zero, which is the incomplete gamma's upper limit")
+    test.assert(str.contains(SpecNegative("x", -0.5).message(), "x"))
+
+    test.case("inside an interval: the message prints the interval the caller was to stay in")
+    let oi = SpecOutOfInterval("y", 1.5, -1.0, 1.0)
+    test.assert(str.contains(oi.message(), "1.5"))
+    test.assert(str.contains(oi.message(), "y"))
+
+    test.case("and a probability that is not one")
+    test.assert(str.contains(SpecNotProbability(1.5).message(), "1.5"))
+
+@test
+fn test_a_bad_argument_from_upstream_is_reported_not_propagated() [io]
+    // A NaN arriving at a special function is a mistake that happened
+    // earlier, and the report is more useful than the propagation.
+    test.case("a NaN names the parameter it arrived in")
+    test.assert(str.contains(SpecNotANumber("x").message(), "x"))
+
+    test.case("and so does an infinity where a finite number was needed")
+    test.assert(str.contains(SpecNotFinite("a").message(), "a"))
+
+@test
+fn test_an_iteration_that_did_not_converge_says_where_and_for_how_long() [io]
+    // An honest numerical library has this case: the continued
+    // fractions behind the inverses converge for every argument in
+    // the domain, and "converges" is not "converges in a fixed number
+    // of steps".
+    test.case("the argument and the budget are both in the message")
+    let nc = SpecNoConvergence("beta_inc_inv", 0.9999, 200)
+    test.assert(str.contains(nc.message(), "beta_inc_inv"))
+    test.assert(str.contains(nc.message(), "200"))

@@ -1,0 +1,302 @@
+// specbessel.nv — the four Bessel functions, each with an
+// integer-order entry point and a real-order one.
+//
+// WHAT THEY ARE.  The Bessel functions are the solutions of Bessel's
+// differential equation, and they are to problems with circular or
+// cylindrical symmetry what the sine and cosine are to problems on a
+// line.  There are four in common use:
+//
+//   * `J`, the Bessel function of the FIRST kind.  It oscillates and
+//     decays like a damped cosine, and it is finite at zero.
+//   * `Y`, the Bessel function of the SECOND kind, also called the
+//     Neumann function.  It oscillates too, and it goes to negative
+//     infinity at zero, so it is undefined at and below zero.
+//   * `I`, the MODIFIED Bessel function of the first kind.  It does
+//     not oscillate; it grows roughly like `exp(x)/sqrt(x)`.
+//   * `K`, the MODIFIED Bessel function of the second kind.  It
+//     decays roughly like `exp(-x)`, and like `Y` it is unbounded at
+//     zero and undefined at and below it.
+//
+// They are the diffraction pattern of a circular aperture, the modes
+// of a drumhead, the temperature in a cylinder, the von Mises
+// distribution's normalising constant, and the Matérn covariance
+// function a Gaussian process is fitted with.
+//
+// WHY THE INTEGER ORDER AND THE REAL ORDER ARE SEPARATE ENTRY POINTS.
+// For an integer order the functions satisfy an exact three-term
+// recurrence — `J(n-1, x) + J(n+1, x) = (2n/x) * J(n, x)` — so the
+// whole family is reachable from two starting values by arithmetic
+// that introduces no error of its own beyond rounding.  For a real
+// order none of that is available: the value comes from a power series
+// near zero, an asymptotic expansion far out, and a continued fraction
+// in between, each of which costs an order of magnitude more work and
+// carries its own error analysis.
+//
+// A caller who knows the order is an integer — and most do; a drumhead
+// mode and a diffraction ring are both indexed by a count — should not
+// pay for the general case, and should not have to write `4.0` where
+// they mean `4` and hope the implementation notices.  So there are two
+// entry points per function, `bessel_j_int` and `bessel_j`, and the
+// integer one takes an `Int`.
+//
+// The naming is not a convenience wrapper in either direction: the
+// integer form is not `bessel_j(n as Float, x)` with a cast, and the
+// real form does not check for an integral argument and dispatch.  Two
+// functions, two algorithms, two accuracy claims.
+//
+// NEGATIVE ORDERS.  For an integer order the reflection is exact:
+// `J(-n, x)` is `(-1)^n * J(n, x)`, and the same for `Y`; `I(-n, x)`
+// is `I(n, x)` and `K(-n, x)` is `K(n, x)`.  The integer entry points
+// accept a negative `n` and apply it.  For a real order the
+// reflection involves a sine of pi times the order and is singular at
+// the integers, so the real-order entry points take a non-negative
+// order and refuse a negative one with `SpecNegative`.
+//
+// ACCURACY.  A relative error at or below 1e-13 against
+// scipy.special for orders up to 100 and arguments up to 1000, and no
+// claim of correct rounding.  Near a zero of `J` or `Y` the ABSOLUTE
+// error is what holds; the README's accuracy section says so.
+
+// The Bessel function of the first kind, of integer order.
+//
+// `bessel_j_int(0, 1.0)` is 0.7651976865579666 and
+// `bessel_j_int(1, 1.0)` is 0.4400505857449335.  Finite for every
+// real argument, including zero and negative arguments: `J(0, 0)` is
+// 1 and `J(n, 0)` is 0 for every other `n`.  A negative order is
+// reflected exactly, so no argument is refused except a NaN or an
+// infinity.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_j_int(0, 1.0)
+//         Ok(v)  => println("${v}")   // 0.7651976865579666
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_j_int(n: Int, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_j_int")
+
+// The Bessel function of the first kind, of real order.
+//
+// The general case, for an order that is not a whole number — a
+// half-integer order, which is what a spherical Bessel function is, or
+// the fitted smoothness parameter of a Matérn covariance.  The order
+// must be at or above zero: `SpecNegative` otherwise, because the
+// reflection for a real order is singular at the integers.  For a
+// non-integer order the argument must also be at or above zero, since
+// the function is complex below it.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_j(0.5, 1.0)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_j(order: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_j")
+
+// The Bessel function of the second kind, of integer order.
+//
+// `bessel_y_int(0, 1.0)` is 0.08825696421567696.  Unbounded at zero
+// and complex below it, so the argument must be strictly positive:
+// `SpecNotPositive` naming `"x"` otherwise.  A negative order is
+// reflected exactly.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_y_int(0, 1.0)
+//         Ok(v)  => println("${v}")   // 0.08825696421567696
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_y_int(n: Int, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_y_int")
+
+// The Bessel function of the second kind, of real order.
+//
+// Same domain restriction on the argument as the integer form, plus a
+// non-negative order.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_y(0.5, 1.0)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_y(order: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_y")
+
+// The modified Bessel function of the first kind, of integer order.
+//
+// `bessel_i_int(0, 1.0)` is 1.2660658777520084.  It does not
+// oscillate; it grows roughly like `exp(x)`, so it overflows for
+// arguments above about 710 — which is a representable infinity and
+// not a fault, and which is what `bessel_i_scaled` exists to avoid.
+// Finite at and below zero, and `I(-n, x)` is `I(n, x)`.
+//
+// This is the normalising constant of the von Mises distribution,
+// which is the normal distribution's counterpart on a circle.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_i_int(0, 1.0)
+//         Ok(v)  => println("${v}")   // 1.2660658777520084
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_i_int(n: Int, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_i_int")
+
+// The modified Bessel function of the first kind, of real order.
+//
+// A non-negative order; a non-integer order also needs a non-negative
+// argument.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_i(0.5, 1.0)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_i(order: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_i")
+
+// The modified Bessel function of the second kind, of integer order.
+//
+// `bessel_k_int(0, 1.0)` is 0.42102443824070834.  Unbounded at zero
+// and undefined below it, so the argument must be strictly positive.
+// It decays like `exp(-x)`, so it underflows to zero for arguments
+// above about 750 — which is what `bessel_k_scaled` exists to avoid.
+// `K(-n, x)` is `K(n, x)`.
+//
+// This is the Matérn covariance function's kernel, and therefore what
+// a Gaussian process regression evaluates at every pair of points.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_k_int(0, 1.0)
+//         Ok(v)  => println("${v}")   // 0.42102443824070834
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_k_int(n: Int, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_k_int")
+
+// The modified Bessel function of the second kind, of real order.
+//
+// A non-negative order and a strictly positive argument.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_k(0.5, 1.0)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_k(order: Float, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_k")
+
+// `exp(-x) * I(n, x)`, computed without the multiplication.
+//
+// `I` overflows above an argument of about 710 and the quantity a
+// caller wants is almost always a ratio in which the exponential
+// cancels — a von Mises density, a Rice distribution, a Bayesian
+// update on a circle.  The scaled form stays representable for every
+// argument and keeps its relative accuracy where the unscaled one has
+// none left.
+//
+// `bessel_i_scaled(0, 0.0)` is 1.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_i_scaled(0, 0.0)
+//         Ok(v)  => println("${v}")   // 1
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_i_scaled(n: Int, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_i_scaled")
+
+// `exp(x) * K(n, x)`, computed without the multiplication.
+//
+// The companion to `bessel_i_scaled` at the other end: `K` underflows
+// to zero above an argument of about 750, and a Matérn covariance at
+// long range is exactly that regime.  Strictly positive argument, as
+// for `bessel_k_int`.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_k_scaled(0, 1.0)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_k_scaled(n: Int, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_k_scaled")
+
+// The `k`th positive zero of `J(n, x)`, counting from 1.
+//
+// The drumhead's modes, the diffraction rings of a circular aperture
+// and the eigenvalues of the Laplacian on a disc are all these
+// numbers.  The first zero of `J(0, x)` is about 2.404825557695773.
+//
+// `SpecNotPositive` naming `"k"` for a `k` below 1.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.bessel_j_zero(0, 1)
+//         Ok(v)  => println("${v}")   // 2.404825557695773
+//         Err(e) => println(e.message())
+// ```
+pub fn bessel_j_zero(n: Int, k: Int) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.bessel_j_zero")
+
+// The spherical Bessel function of the first kind, of integer order.
+//
+// `J(n + 1/2, x)` times `sqrt(pi / (2x))`, which is the solution of
+// the radial equation in three dimensions rather than two.  It is
+// here as its own function because it is elementary — `j(0, x)` is
+// `sin(x)/x` — and computing it through the half-integer order loses
+// digits that the direct recurrence keeps.  `j(0, 0)` is 1.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.spherical_j(0, 0.0)
+//         Ok(v)  => println("${v}")   // 1
+//         Err(e) => println(e.message())
+// ```
+pub fn spherical_j(n: Int, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.spherical_j")
+
+// The spherical Bessel function of the second kind, of integer order.
+//
+// `y(0, x)` is `-cos(x)/x`, so the argument must be strictly
+// positive: `SpecNotPositive` naming `"x"` otherwise.
+//
+// ```novo
+// use specbessel
+//
+// fn main() [io]
+//     match specbessel.spherical_y(0, 1.0)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn spherical_y(n: Int, x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specbessel.spherical_y")

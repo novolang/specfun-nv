@@ -1,0 +1,114 @@
+// specfault.nv — the one thing that can go wrong, and the eight ways
+// it does.
+//
+// WHY EVERY FUNCTION IN THIS PACKAGE RETURNS A `Result`.  Not one of
+// these functions is defined on the whole real line, and the domains
+// are not obvious from the names.  The gamma function has poles at
+// zero and at every negative integer.  The inverse error function is
+// defined only on the open interval from -1 to 1.  The Bessel
+// functions of the second kind, `Y` and `K`, are undefined at zero and
+// below it.  The regularised incomplete gamma needs a shape parameter
+// strictly above zero and an argument at or above zero, and the
+// incomplete beta needs both shapes strictly above zero and an
+// argument between zero and one.
+//
+// The usual answer to all of that is to return a NaN, and it is the
+// wrong one.  A NaN carries no reason: a caller who gets one back from
+// a likelihood calculation with four special-function calls in it has
+// to bisect the expression to find out which argument was out of
+// range.  Worse, a NaN propagates silently through arithmetic, so the
+// value that finally gets printed is several operations away from the
+// mistake.  A statistical routine that reports a NaN likelihood has
+// usually been given a negative variance, and that is the sentence the
+// caller needs to read.
+//
+// So every function here answers `Result<Float, SpecFault>`, the fault
+// NAMES the domain rule that was broken in the specification's own
+// words, and it carries the argument that broke it.
+//
+// WHAT IS NOT A FAULT.  An overflow is not.  `gamma(200.0)` is larger
+// than any `Float`, and the honest answer is a positive infinity,
+// which is what IEEE 754 arithmetic produces and what the caller
+// should have used `log_gamma` to avoid.  Underflow to zero is not a
+// fault either.  Both are representable results of a well-posed
+// question, and turning them into errors would make a caller write a
+// match around a calculation that is behaving correctly.
+//
+// WHY THE VARIANT NAMES ARE ALL Spec-PREFIXED.  An enum variant is
+// constructed by its bare name across the whole assembly, so
+// `DomainError` declared here would bind every `DomainError` in any
+// program that also depends on a package that declared one.
+
+// Why a special function could not answer.
+//
+// ```novo
+// use specfault
+//
+// fn main() [io]
+//     let e = SpecGammaPole(-3.0)
+//     println(e.message())
+// ```
+pub enum SpecFault
+    // The gamma function, or a function built on it, was asked for a
+    // value at one of its poles: zero, or a negative integer.  The
+    // function is unbounded there and the limits from the two sides
+    // have opposite signs, so there is no value to return and no
+    // infinity that would be less wrong than the other one.
+    SpecGammaPole(at: Float)
+    // An argument had to be strictly positive and was not.  Raised by
+    // `log_beta`, by the shape parameters of both incomplete forms,
+    // and by `bessel_y` and `bessel_k`, which are undefined at zero
+    // and below.  `name` is the parameter as the reference spells it —
+    // `"a"`, `"b"`, `"x"`.
+    SpecNotPositive(name: Str, got: Float)
+    // An argument had to be at or above zero and was below it.  The
+    // upper limit of the regularised incomplete gamma is the case
+    // this covers: zero is a legitimate argument there and a negative
+    // number is not.
+    SpecNegative(name: Str, got: Float)
+    // An argument had to lie inside an interval and did not.  Raised
+    // by `erf_inv` and `erfc_inv`, whose domains are the open
+    // intervals (-1, 1) and (0, 2), and by the regularised incomplete
+    // beta, whose argument lies in the closed interval from 0 to 1.
+    // The bounds are carried so the message can print the interval
+    // the caller was supposed to stay inside.
+    SpecOutOfInterval(name: Str, got: Float, low: Float, high: Float)
+    // A probability handed to an inverse was not a probability.  The
+    // inverses of the regularised incomplete forms take a value in
+    // [0, 1] and answer the argument that produces it; anything else
+    // names no point on the curve.
+    SpecNotProbability(got: Float)
+    // An argument was a NaN.  Every function here refuses one rather
+    // than propagating it, because a NaN arriving at a special
+    // function is a mistake that happened earlier and the report is
+    // more useful than the propagation.  `name` says which parameter
+    // it arrived in.
+    SpecNotANumber(name: Str)
+    // An argument was an infinity where the function needs a finite
+    // number.  `name` says which parameter.
+    SpecNotFinite(name: Str)
+    // An iteration did not reach the accuracy the package claims
+    // within its budget.  It is here because an honest numerical
+    // library has this case: the continued fractions behind the
+    // incomplete forms and the inverses converge for every argument in
+    // the domain, but "converges" is not "converges in a fixed number
+    // of steps".  A caller that sees this has found an argument worth
+    // reporting, and the message carries it along with the number of
+    // iterations that were spent.
+    SpecNoConvergence(what: Str, at: Float, iterations: Int)
+
+// `SpecFault` is an `Error`, which is what lets `Result<Float,
+// SpecFault>` exist at all (SPEC § 3.4).
+impl Error for SpecFault
+    // The one-line message: the function, the rule it could not
+    // satisfy, and the argument that broke it.
+    //
+    // It states the domain rule in words rather than naming a code —
+    // "the gamma function has a pole at -3", "erf_inv is defined on
+    // (-1, 1) and was given 1.5" — because the reader of the message
+    // is usually someone who did not write the call and does not have
+    // the reference open.
+    //
+    // Panics with `not implemented` until the bodies land.
+    fn message(self) -> Str
+        todo("specfun-nv.SpecFault.message")

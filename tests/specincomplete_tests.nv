@@ -1,0 +1,191 @@
+// specincomplete_tests.nv — the two cumulative distribution functions
+// half of statistics is written with.
+//
+// RED ON PURPOSE: every assertion reaches `not implemented:
+// specfun-nv.specincomplete.<fn>`.
+//
+// The reference values are scipy.special's `gammainc`, `gammaincc`
+// and `betainc` at the arguments a reader can check by hand: with a
+// shape of 1 the incomplete gamma IS the exponential distribution, so
+// `P(1, 1)` is `1 - 1/e`; and `I_x(2, 3)` at a half is eleven
+// sixteenths.  Everything else is asserted as an identity — `P + Q` is
+// 1, the inverses round-trip, and the beta symmetry
+// `I_x(a, b) = 1 - I_{1-x}(b, a)` holds.
+
+use std.test
+use specincomplete
+
+@test
+fn test_the_regularised_incomplete_gamma_is_the_gamma_cdf() [io]
+    test.case("with a shape of 1 it is the exponential distribution: P(1, 1) is 1 - 1/e")
+    match specincomplete.gamma_p(1.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.6321205588285577, 1e-14)
+
+    test.case("it starts at 0")
+    match specincomplete.gamma_p(2.0, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.0, 1e-15)
+
+    test.case("and it reaches 1")
+    match specincomplete.gamma_p(2.0, 200.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-14)
+
+@test
+fn test_the_upper_form_is_computed_directly_and_the_pair_sums_to_one() [io]
+    // `Q` exists for the reason `erfc` does: in the far tail it is
+    // the small number the caller wants, and `1 - P` there has almost
+    // no correct digits left.
+    test.case("Q(1, 1) is 1/e")
+    match specincomplete.gamma_q(1.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.36787944117144233, 1e-14)
+
+    test.case("P + Q is 1 — an identity, not an implementation")
+    match specincomplete.gamma_p(3.5, 2.0)
+        Err(e) => test.fail(e.message())
+        Ok(p)  =>
+            match specincomplete.gamma_q(3.5, 2.0)
+                Err(e) => test.fail(e.message())
+                Ok(q)  => test.assert_approx(p + q, 1.0, 1e-14)
+
+@test
+fn test_the_incomplete_gamma_refuses_what_is_outside_its_domain() [io]
+    test.case("the shape must be strictly positive")
+    match specincomplete.gamma_p(0.0, 1.0)
+        Ok(_)  => test.fail("the incomplete gamma needs a > 0")
+        Err(_) => test.assert(true)
+    match specincomplete.gamma_q(-1.0, 1.0)
+        Ok(_)  => test.fail("the incomplete gamma needs a > 0")
+        Err(_) => test.assert(true)
+
+    test.case("the argument may be zero but not negative")
+    match specincomplete.gamma_p(1.0, -0.5)
+        Ok(_)  => test.fail("the incomplete gamma needs x >= 0")
+        Err(_) => test.assert(true)
+
+@test
+fn test_the_gamma_inverses_are_the_chi_squared_critical_values() [io]
+    test.case("gamma_p_inv undoes gamma_p")
+    match specincomplete.gamma_p_inv(1.0, 0.6321205588285577)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-11)
+
+    test.case("gamma_q_inv undoes gamma_q")
+    match specincomplete.gamma_q_inv(1.0, 0.36787944117144233)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-11)
+
+    test.case("a probability of 0 is the left end of the distribution")
+    match specincomplete.gamma_p_inv(2.0, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.0, 1e-12)
+
+    test.case("and something that is not a probability is refused")
+    match specincomplete.gamma_p_inv(2.0, 1.5)
+        Ok(_)  => test.fail("1.5 is not a probability")
+        Err(_) => test.assert(true)
+    match specincomplete.gamma_q_inv(2.0, -0.1)
+        Ok(_)  => test.fail("-0.1 is not a probability")
+        Err(_) => test.assert(true)
+
+@test
+fn test_the_regularised_incomplete_beta_is_the_beta_cdf() [io]
+    test.case("I_0.5(2, 3) is eleven sixteenths")
+    match specincomplete.beta_inc(2.0, 3.0, 0.5)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.6875, 1e-14)
+
+    test.case("it runs from 0 at x = 0 to 1 at x = 1")
+    match specincomplete.beta_inc(2.0, 3.0, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.0, 1e-15)
+    match specincomplete.beta_inc(2.0, 3.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-15)
+
+    test.case("with both shapes 1 it is the uniform distribution, so I_x(1, 1) is x")
+    match specincomplete.beta_inc(1.0, 1.0, 0.25)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.25, 1e-15)
+
+@test
+fn test_the_beta_complement_and_the_symmetry_it_is_written_from() [io]
+    test.case("the complement of 0.6875 is 0.3125")
+    match specincomplete.beta_inc_c(2.0, 3.0, 0.5)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.3125, 1e-14)
+
+    test.case("I_x(a, b) = 1 - I_{1-x}(b, a), which is what lets the small side be the computed one")
+    match specincomplete.beta_inc(2.0, 3.0, 0.25)
+        Err(e) => test.fail(e.message())
+        Ok(a)  =>
+            match specincomplete.beta_inc(3.0, 2.0, 0.75)
+                Err(e) => test.fail(e.message())
+                Ok(b)  => test.assert_approx(a + b, 1.0, 1e-14)
+
+@test
+fn test_the_incomplete_beta_refuses_what_is_outside_its_domain() [io]
+    test.case("both shapes must be strictly positive, and the fault names which")
+    match specincomplete.beta_inc(0.0, 3.0, 0.5)
+        Ok(_)  => test.fail("the incomplete beta needs a > 0")
+        Err(_) => test.assert(true)
+    match specincomplete.beta_inc(2.0, 0.0, 0.5)
+        Ok(_)  => test.fail("the incomplete beta needs b > 0")
+        Err(_) => test.assert(true)
+
+    test.case("the argument lies in [0, 1]")
+    match specincomplete.beta_inc(2.0, 3.0, 1.5)
+        Ok(_)  => test.fail("the incomplete beta needs 0 <= x <= 1")
+        Err(_) => test.assert(true)
+    match specincomplete.beta_inc_c(2.0, 3.0, -0.5)
+        Ok(_)  => test.fail("the incomplete beta needs 0 <= x <= 1")
+        Err(_) => test.assert(true)
+
+@test
+fn test_the_beta_inverse_is_the_t_and_f_critical_value() [io]
+    test.case("beta_inc_inv undoes beta_inc")
+    match specincomplete.beta_inc_inv(2.0, 3.0, 0.6875)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.5, 1e-11)
+
+    test.case("the ends of the distribution are its ends")
+    match specincomplete.beta_inc_inv(2.0, 3.0, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.0, 1e-12)
+    match specincomplete.beta_inc_inv(2.0, 3.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-12)
+
+    test.case("and something that is not a probability is refused")
+    match specincomplete.beta_inc_inv(2.0, 3.0, 2.0)
+        Ok(_)  => test.fail("2.0 is not a probability")
+        Err(_) => test.assert(true)
+
+@test
+fn test_the_logarithmic_forms_are_finite_where_the_probability_underflows() [io]
+    // A log-likelihood written as `ln(gamma_p(a, x))` is `ln(0.0)`
+    // for shape parameters a fitting routine reaches easily.
+    test.case("log_gamma_p agrees with the logarithm of gamma_p where both are representable")
+    match specincomplete.log_gamma_p(1.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, -0.4586751453870818, 1e-12)
+
+    test.case("and it stays finite where the probability itself does not")
+    match specincomplete.log_gamma_p(500.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert(v < -1000.0)
+
+    test.case("log_beta_inc agrees with the logarithm of beta_inc")
+    match specincomplete.log_beta_inc(2.0, 3.0, 0.5)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, -0.3746934494414107, 1e-12)
+
+    test.case("and both logarithmic forms keep their arguments' domain rules")
+    match specincomplete.log_gamma_p(-1.0, 1.0)
+        Ok(_)  => test.fail("the incomplete gamma needs a > 0")
+        Err(_) => test.assert(true)
+    match specincomplete.log_beta_inc(2.0, 3.0, 2.0)
+        Ok(_)  => test.fail("the incomplete beta needs 0 <= x <= 1")
+        Err(_) => test.assert(true)

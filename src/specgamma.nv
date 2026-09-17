@@ -1,0 +1,210 @@
+// specgamma.nv — the gamma function and the three functions that are
+// built out of it.
+//
+// WHAT THE GAMMA FUNCTION IS.  It is the extension of the factorial to
+// the whole real line: for a positive integer `n`, `gamma(n)` is
+// `(n-1)!`, and between the integers it is the smooth curve that
+// satisfies `gamma(x+1) = x * gamma(x)` everywhere else.  It is the
+// function every continuous probability distribution's normalising
+// constant is written with, which is why a statistics package that
+// does not have it cannot spell the chi-squared density, the
+// Student's t density, or the beta density at all.
+//
+// WHY `log_gamma` IS TWO FUNCTIONS.  `gamma(171.0)` is about
+// 7.26e306, and `gamma(172.0)` overflows a 64-bit float.  Since the
+// gamma function usually appears inside a ratio, the standard answer
+// is to work with its logarithm and subtract — and for negative
+// arguments the gamma function is negative on half of its intervals,
+// so its logarithm is complex.  Every library that tried to return
+// that from one `Float` ended up returning a NaN for half the negative
+// line, and callers learned to distrust it.
+//
+// Here `log_gamma` answers the logarithm of the ABSOLUTE value and
+// `log_gamma_sign` answers the sign, as two functions.  Nothing is
+// lost, nothing is a NaN, and a caller reconstructing a signed
+// quantity multiplies the two back together.  That is the same
+// division of labour Fortran's `LGAMMA` and `SIGNGAM` made, and it is
+// the only one that fits in a real-valued signature.
+//
+// THE POLES ARE REFUSED, NOT APPROXIMATED.  At zero and at every
+// negative integer the gamma function is unbounded, and the limits
+// from the left and from the right have opposite signs.  There is no
+// value to return and no infinity that is less wrong than the other,
+// so these arguments are `SpecGammaPole` and the fault carries the
+// argument.
+//
+// ACCURACY.  The target for every function in this module is a
+// relative error at or below 1e-14 over the range where the result is
+// representable, measured against scipy.special.  None of them is
+// claimed to be correctly rounded; the README's accuracy section says
+// so once for the whole package.
+
+// The gamma function, the smooth extension of the factorial.
+//
+// `gamma(n)` is `(n-1)!` for a positive integer `n`: `gamma(5.0)` is
+// 24.  `SpecGammaPole` at zero and at every negative integer, where
+// the function is unbounded.  An argument large enough to overflow
+// answers a positive infinity rather than a fault, which is the case
+// `log_gamma` exists for.
+//
+// ```novo
+// use specgamma
+//
+// fn main() [io]
+//     match specgamma.gamma(5.0)
+//         Ok(v)  => println("${v}")   // 24
+//         Err(e) => println(e.message())
+// ```
+pub fn gamma(x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specgamma.gamma")
+
+// The natural logarithm of the ABSOLUTE value of the gamma function.
+//
+// Finite wherever the gamma function is defined, including where the
+// gamma function itself overflows: `log_gamma(1000.0)` is about
+// 5905.22 where `gamma(1000.0)` is an infinity.  This is the function
+// a likelihood is written with, and the reason a likelihood is
+// computed as a sum of logarithms rather than a product.
+//
+// `SpecGammaPole` at zero and at every negative integer.  Use
+// `log_gamma_sign` for the sign the absolute value discarded.
+//
+// ```novo
+// use specgamma
+//
+// fn main() [io]
+//     match specgamma.log_gamma(1.0)
+//         Ok(v)  => println("${v}")   // 0
+//         Err(e) => println(e.message())
+// ```
+pub fn log_gamma(x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specgamma.log_gamma")
+
+// The sign of the gamma function at this argument: `1.0` or `-1.0`.
+//
+// Always `1.0` for a positive argument.  For a negative one the gamma
+// function alternates sign on each interval between consecutive
+// negative integers, and this is the half of the answer that
+// `log_gamma` could not carry.  `SpecGammaPole` on the same arguments
+// `log_gamma` refuses, so the pair is total on exactly the same
+// domain.
+//
+// ```novo
+// use specgamma
+//
+// fn main() [io]
+//     match specgamma.log_gamma_sign(-0.5)
+//         Ok(s)  => println("${s}")   // -1
+//         Err(e) => println(e.message())
+// ```
+pub fn log_gamma_sign(x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specgamma.log_gamma_sign")
+
+// The digamma function: the derivative of `log_gamma`.
+//
+// Written `psi` in the references.  `digamma(1.0)` is the negative of
+// the Euler–Mascheroni constant, -0.5772156649015329.  It is what the
+// gradient of a likelihood in a gamma, beta or Dirichlet model is made
+// of, so a fitting routine that has gamma but not digamma has to
+// differentiate numerically and loses half its digits doing it.
+//
+// `SpecGammaPole` at zero and at every negative integer, where the
+// gamma function itself is unbounded.
+//
+// ```novo
+// use specgamma
+//
+// fn main() [io]
+//     match specgamma.digamma(1.0)
+//         Ok(v)  => println("${v}")   // -0.5772156649015329
+//         Err(e) => println(e.message())
+// ```
+pub fn digamma(x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specgamma.digamma")
+
+// The beta function: `gamma(a) * gamma(b) / gamma(a + b)`.
+//
+// The normalising constant of the beta distribution, and symmetric in
+// its two arguments.  `beta(2.0, 3.0)` is one twelfth.  Computing it
+// from three calls to `gamma` overflows for arguments a fitting
+// routine reaches easily, so it is its own function and computed
+// through the logarithms.
+//
+// `SpecGammaPole` when any of `a`, `b` or `a + b` is a pole of the
+// gamma function.
+//
+// ```novo
+// use specgamma
+//
+// fn main() [io]
+//     match specgamma.beta(2.0, 3.0)
+//         Ok(v)  => println("${v}")   // 0.08333333333333333
+//         Err(e) => println(e.message())
+// ```
+pub fn beta(a: Float, b: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specgamma.beta")
+
+// The natural logarithm of the beta function.
+//
+// `log_gamma(a) + log_gamma(b) - log_gamma(a + b)`, and finite over
+// the whole range a model fit walks through, where `beta` itself
+// underflows to zero.  Both arguments must be strictly positive —
+// `SpecNotPositive` naming the one that was not — because the
+// logarithm of a negative beta value is not a real number and the
+// sign-carrying trick that `log_gamma_sign` makes available is not
+// worth a second function nobody calls.
+//
+// ```novo
+// use specgamma
+//
+// fn main() [io]
+//     match specgamma.log_beta(2.0, 3.0)
+//         Ok(v)  => println("${v}")
+//         Err(e) => println(e.message())
+// ```
+pub fn log_beta(a: Float, b: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specgamma.log_beta")
+
+// The rising factorial `x * (x+1) * … * (x+n-1)`, also called the
+// Pochhammer symbol.
+//
+// `gamma(x + n) / gamma(x)` written so that it neither overflows nor
+// loses the exact answer for a small integer `n`: `rising_factorial(1.0,
+// 5)` is 120 exactly.  It is here because every series expansion in
+// `specincomplete` and `specbessel` has one in its terms, and because
+// a caller writing a hypergeometric term by hand needs it.
+//
+// `SpecNegative` for a negative `n`.
+//
+// ```novo
+// use specgamma
+//
+// fn main() [io]
+//     match specgamma.rising_factorial(1.0, 5)
+//         Ok(v)  => println("${v}")   // 120
+//         Err(e) => println(e.message())
+// ```
+pub fn rising_factorial(x: Float, n: Int) -> Result<Float, SpecFault>
+    todo("specfun-nv.specgamma.rising_factorial")
+
+// The binomial coefficient, for real arguments.
+//
+// `gamma(n+1) / (gamma(k+1) * gamma(n-k+1))`, computed through the
+// logarithms so that `binomial(1000.0, 500.0)` answers rather than
+// overflowing on the way to a representable result.  For non-negative
+// integers written as floats it is the exact count a reader expects:
+// `binomial(5.0, 2.0)` is 10.
+//
+// `SpecGammaPole` when the expression meets a pole of the gamma
+// function.
+//
+// ```novo
+// use specgamma
+//
+// fn main() [io]
+//     match specgamma.binomial(5.0, 2.0)
+//         Ok(v)  => println("${v}")   // 10
+//         Err(e) => println(e.message())
+// ```
+pub fn binomial(n: Float, k: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specgamma.binomial")

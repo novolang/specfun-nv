@@ -1,0 +1,158 @@
+// specerf.nv — the error function, its complement, and the two
+// inverses.
+//
+// WHAT THE ERROR FUNCTION IS.  `erf(x)` is twice the integral of
+// `exp(-t^2)` from 0 to `x`, divided by the square root of pi.  It is
+// the shape of the normal distribution's cumulative probability: the
+// chance that a standard normal draw falls within `x * sqrt(2)` of its
+// mean is `erf(x)`.  It runs from -1 at negative infinity to 1 at
+// positive infinity, it is odd — `erf(-x)` is `-erf(x)` — and it is
+// zero at zero.
+//
+// WHY `erfc` IS A SEPARATE FUNCTION AND NOT `1 - erf(x)`.  For an
+// argument of 6, `erf(x)` is 0.9999999999999999779…, and subtracting
+// that from 1 in binary floating point leaves about two correct
+// digits out of sixteen.  The quantity that matters in a tail
+// probability IS that difference, so `erfc` computes it directly and
+// keeps its accuracy out to arguments around 27, where it underflows.
+// A caller computing a p-value, a tail bound or a survival function
+// wants `erfc` and never `1 - erf`.  This is the single most common
+// accuracy mistake in statistical code and it is why the complement
+// exists in every reference implementation.
+//
+// THE INVERSES AND THEIR DOMAINS.  `erf_inv` is defined on the OPEN
+// interval (-1, 1) and `erfc_inv` on the open interval (0, 2); at the
+// endpoints the answer is an infinity and the argument is refused with
+// `SpecOutOfInterval` naming the interval.  They are what turns a
+// requested confidence level into a number of standard deviations,
+// which is the calculation behind every critical value in a table.
+//
+// ACCURACY.  A relative error at or below 1e-14 against
+// scipy.special over the representable range, and no claim of correct
+// rounding.
+
+// The error function.
+//
+// Odd, so `erf(-x)` is `-erf(x)`; `erf(0.0)` is 0 and `erf(1.0)` is
+// 0.8427007929497149.  Defined and finite for every real argument,
+// and saturating to 1 and -1 well before the argument overflows — so
+// the only faults are a NaN or an infinity handed in, which are
+// mistakes that happened upstream.
+//
+// For a tail probability use `erfc`: `1.0 - erf(x)` loses almost all
+// of its digits once `x` is above about 3.
+//
+// ```novo
+// use specerf
+//
+// fn main() [io]
+//     match specerf.erf(1.0)
+//         Ok(v)  => println("${v}")   // 0.8427007929497149
+//         Err(e) => println(e.message())
+// ```
+pub fn erf(x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specerf.erf")
+
+// The complementary error function, `1 - erf(x)`, computed without
+// the subtraction.
+//
+// `erfc(1.0)` is 0.15729920705028513.  It keeps its relative accuracy
+// into the far tail, where the subtraction has none: this is the
+// function a p-value, a survival function and a tail bound are
+// written with.  It underflows to zero for arguments above about 27,
+// which is a representable answer and not a fault.
+//
+// ```novo
+// use specerf
+//
+// fn main() [io]
+//     match specerf.erfc(1.0)
+//         Ok(v)  => println("${v}")   // 0.15729920705028513
+//         Err(e) => println(e.message())
+// ```
+pub fn erfc(x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specerf.erfc")
+
+// The scaled complementary error function, `exp(x*x) * erfc(x)`.
+//
+// The scaling removes the exponential decay, so this stays close to
+// zero-order size — about 0.05 at `x = 10` — where `erfc` itself is
+// 2.09e-45 and heading for underflow.  A Mills ratio, a hazard rate
+// and a truncated-normal moment are all quotients in which the
+// exponential cancels, and computing them from `erfc` throws away the
+// digits before the cancellation can recover them.
+//
+// ```novo
+// use specerf
+//
+// fn main() [io]
+//     match specerf.erfcx(0.0)
+//         Ok(v)  => println("${v}")   // 1
+//         Err(e) => println(e.message())
+// ```
+pub fn erfcx(x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specerf.erfcx")
+
+// The inverse of the error function.
+//
+// `erf_inv(erf(x))` is `x`.  Defined on the OPEN interval from -1 to
+// 1; at -1 and 1 the answer is an infinity, so both endpoints and
+// everything outside them are `SpecOutOfInterval` carrying the
+// interval.  `erf_inv(0.0)` is 0.
+//
+// This is how a confidence level becomes a number of standard
+// deviations, and therefore how every critical value in a table is
+// computed.
+//
+// ```novo
+// use specerf
+//
+// fn main() [io]
+//     match specerf.erf_inv(0.0)
+//         Ok(v)  => println("${v}")   // 0
+//         Err(e) => println(e.message())
+// ```
+pub fn erf_inv(y: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specerf.erf_inv")
+
+// The inverse of the complementary error function.
+//
+// `erfc_inv(erfc(x))` is `x`, and `erfc_inv(1.0)` is 0.  Defined on
+// the OPEN interval from 0 to 2; both endpoints are
+// `SpecOutOfInterval`.
+//
+// It is the inverse to use for a small tail probability, for the same
+// reason `erfc` is the function to use for one: the argument a caller
+// has is the tail area itself, and turning it into `1 - p` before
+// inverting throws away the digits that made it small.
+//
+// ```novo
+// use specerf
+//
+// fn main() [io]
+//     match specerf.erfc_inv(1.0)
+//         Ok(v)  => println("${v}")   // 0
+//         Err(e) => println(e.message())
+// ```
+pub fn erfc_inv(y: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specerf.erfc_inv")
+
+// Dawson's integral: `exp(-x*x)` times the integral of `exp(t*t)` from
+// 0 to `x`.
+//
+// The error function's companion on the imaginary axis, and the odd
+// function that peaks at about 0.5410442246 near `x = 0.924`.  It is
+// here because it is what a spectral line profile and a plasma
+// dispersion function are written with, and because computing it from
+// `erf` of an imaginary argument is not available in real arithmetic.
+//
+// ```novo
+// use specerf
+//
+// fn main() [io]
+//     match specerf.dawson(0.0)
+//         Ok(v)  => println("${v}")   // 0
+//         Err(e) => println(e.message())
+// ```
+pub fn dawson(x: Float) -> Result<Float, SpecFault>
+    todo("specfun-nv.specerf.dawson")

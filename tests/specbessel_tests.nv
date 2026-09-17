@@ -1,0 +1,215 @@
+// specbessel_tests.nv — the four Bessel functions, and the two entry
+// points each of them has.
+//
+// RED ON PURPOSE: every assertion reaches `not implemented:
+// specfun-nv.specbessel.<fn>`.
+//
+// The reference values are scipy.special's `jv`, `yv`, `iv` and `kv`
+// at an argument of 1, which is where every reference table starts.
+// The three-term recurrence and the agreement between the
+// integer-order and the real-order entry points are asserted as
+// identities: they constrain the implementation at every order rather
+// than at one.
+
+use std.test
+use specbessel
+
+@test
+fn test_the_first_kind_at_the_values_scipy_publishes() [io]
+    test.case("J(0, 1) and J(1, 1)")
+    match specbessel.bessel_j_int(0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.7651976865579666, 1e-14)
+    match specbessel.bessel_j_int(1, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.4400505857449335, 1e-14)
+
+    test.case("J is finite at zero: J(0, 0) is 1 and every other order is 0 there")
+    match specbessel.bessel_j_int(0, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-15)
+    match specbessel.bessel_j_int(3, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.0, 1e-15)
+
+    test.case("a negative integer order reflects exactly: J(-1, x) is -J(1, x)")
+    match specbessel.bessel_j_int(-1, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, -0.4400505857449335, 1e-14)
+
+@test
+fn test_the_three_term_recurrence_the_integer_entry_point_exists_for() [io]
+    // `J(n-1, x) + J(n+1, x) = (2n/x) * J(n, x)`.  It is exact, it is
+    // cheap, and it is why a caller who knows the order is a whole
+    // number should not pay for the general case.
+    test.case("at n = 1 and x = 1, J(0) + J(2) is 2 * J(1)")
+    match specbessel.bessel_j_int(0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(j0) =>
+            match specbessel.bessel_j_int(2, 1.0)
+                Err(e) => test.fail(e.message())
+                Ok(j2) =>
+                    match specbessel.bessel_j_int(1, 1.0)
+                        Err(e) => test.fail(e.message())
+                        Ok(j1) => test.assert_approx(j0 + j2, 2.0 * j1, 1e-14)
+
+    test.case("and J(2, 1) is scipy's 0.11490348493190047")
+    match specbessel.bessel_j_int(2, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.11490348493190047, 1e-14)
+
+@test
+fn test_the_real_order_entry_point_agrees_with_the_integer_one() [io]
+    // Two algorithms, one answer.  This is the assertion that keeps
+    // the two entry points honest about being the same function.
+    test.case("bessel_j at an integral order matches bessel_j_int")
+    match specbessel.bessel_j(0.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.7651976865579666, 1e-13)
+    match specbessel.bessel_j(1.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.4400505857449335, 1e-13)
+
+    test.case("a half-integer order is a spherical Bessel function: J(1/2, x) is sin(x)*sqrt(2/(pi*x))")
+    match specbessel.bessel_j(0.5, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.6713967071418031, 1e-13)
+
+    test.case("a NEGATIVE real order is refused, because the reflection is singular at the integers")
+    match specbessel.bessel_j(-0.5, 1.0)
+        Ok(_)  => test.fail("the real-order entry point takes a non-negative order")
+        Err(_) => test.assert(true)
+
+@test
+fn test_the_second_kind_is_undefined_at_and_below_zero() [io]
+    test.case("Y(0, 1) is scipy's 0.08825696421567696")
+    match specbessel.bessel_y_int(0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.08825696421567696, 1e-14)
+
+    test.case("Y is unbounded at zero, so zero is refused")
+    match specbessel.bessel_y_int(0, 0.0)
+        Ok(_)  => test.fail("Y is unbounded at 0")
+        Err(_) => test.assert(true)
+
+    test.case("and so is every negative argument, where it is complex")
+    match specbessel.bessel_y_int(0, -1.0)
+        Ok(_)  => test.fail("Y is complex below 0")
+        Err(_) => test.assert(true)
+    match specbessel.bessel_y(0.5, -1.0)
+        Ok(_)  => test.fail("Y is complex below 0")
+        Err(_) => test.assert(true)
+
+    test.case("the real-order form agrees with the integer one")
+    match specbessel.bessel_y(0.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.08825696421567696, 1e-13)
+
+@test
+fn test_the_modified_first_kind_grows_and_the_scaled_form_does_not() [io]
+    test.case("I(0, 1) is scipy's 1.2660658777520084")
+    match specbessel.bessel_i_int(0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.2660658777520084, 1e-14)
+
+    test.case("I(0, 0) is 1, and I is even in its order")
+    match specbessel.bessel_i_int(0, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-15)
+    match specbessel.bessel_i_int(-1, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.5651591039924851, 1e-14)
+
+    test.case("the real-order form agrees with the integer one")
+    match specbessel.bessel_i(0.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.2660658777520084, 1e-13)
+
+    test.case("the scaled form is exp(-x) * I(n, x), and at 0 it is I itself")
+    match specbessel.bessel_i_scaled(0, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-15)
+
+    test.case("and it stays representable at 800, where I(0, 800) is an infinity")
+    match specbessel.bessel_i_scaled(0, 800.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  =>
+            test.assert(v > 0.0)
+            test.assert(v < 1.0)
+
+@test
+fn test_the_modified_second_kind_decays_and_the_scaled_form_does_not() [io]
+    test.case("K(0, 1) is scipy's 0.42102443824070834")
+    match specbessel.bessel_k_int(0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.42102443824070834, 1e-14)
+
+    test.case("K is unbounded at zero and undefined below it")
+    match specbessel.bessel_k_int(0, 0.0)
+        Ok(_)  => test.fail("K is unbounded at 0")
+        Err(_) => test.assert(true)
+    match specbessel.bessel_k(0.5, -1.0)
+        Ok(_)  => test.fail("K is undefined below 0")
+        Err(_) => test.assert(true)
+
+    test.case("the real-order form agrees with the integer one")
+    match specbessel.bessel_k(0.0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.42102443824070834, 1e-13)
+
+    test.case("and it is even in its order, like I")
+    match specbessel.bessel_k_int(-1, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.6019072301972346, 1e-14)
+
+    test.case("the scaled form is exp(x) * K(n, x), so at 1 it is e times K(0, 1)")
+    match specbessel.bessel_k_scaled(0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(s)  =>
+            match specbessel.bessel_k_int(0, 1.0)
+                Err(e) => test.fail(e.message())
+                Ok(k)  => test.assert_approx(s, 2.718281828459045 * k, 1e-13)
+
+    test.case("and it stays above zero at 800, where K(0, 800) has underflowed")
+    match specbessel.bessel_k_scaled(0, 800.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert(v > 0.0)
+
+@test
+fn test_the_zeros_of_j_are_the_drumheads_modes() [io]
+    test.case("the first zero of J(0, x) is 2.404825557695773")
+    match specbessel.bessel_j_zero(0, 1)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 2.404825557695773, 1e-12)
+
+    test.case("the second is 5.520078110286311")
+    match specbessel.bessel_j_zero(0, 2)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 5.520078110286311, 1e-12)
+
+    test.case("the zeros are counted from 1, so 0 names none of them")
+    match specbessel.bessel_j_zero(0, 0)
+        Ok(_)  => test.fail("the zeros are counted from 1")
+        Err(_) => test.assert(true)
+
+@test
+fn test_the_spherical_forms_are_elementary_at_order_zero() [io]
+    test.case("spherical_j(0, x) is sin(x)/x, so at 1 it is sin(1)")
+    match specbessel.spherical_j(0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 0.8414709848078965, 1e-14)
+
+    test.case("and its limit at zero is 1, not a division by zero")
+    match specbessel.spherical_j(0, 0.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, 1.0, 1e-15)
+
+    test.case("spherical_y(0, x) is -cos(x)/x, so at 1 it is -cos(1)")
+    match specbessel.spherical_y(0, 1.0)
+        Err(e) => test.fail(e.message())
+        Ok(v)  => test.assert_approx(v, -0.5403023058681398, 1e-14)
+
+    test.case("and it is unbounded at zero, so zero is refused")
+    match specbessel.spherical_y(0, 0.0)
+        Ok(_)  => test.fail("spherical_y is unbounded at 0")
+        Err(_) => test.assert(true)
